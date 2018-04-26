@@ -4,6 +4,7 @@ using System.Text;
 
 namespace ICSharpCode.SharpZipLib.Tar
 {
+	/// <inheritdoc />
 	/// <summary>
 	///     The TarInputStream reads a UNIX tar archive as an InputStream.
 	///     methods are provided to position at each successive entry in
@@ -19,7 +20,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <remarks>The default value is true.</remarks>
 		public bool IsStreamOwner
 		{
-			get => _tarBuffer.IsStreamOwner;
 			set => _tarBuffer.IsStreamOwner = value;
 		}
 
@@ -27,33 +27,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		///     Get the record size being used by this stream's TarBuffer.
 		/// </summary>
 		public int RecordSize => _tarBuffer.RecordSize;
-
-		/// <summary>
-		///     Get the available data that can be read from the current
-		///     entry in the archive. This does not indicate how much data
-		///     is left in the entire archive, only in the current entry.
-		///     This value is determined from the entry's size header field
-		///     and the amount of data already read from the current entry.
-		/// </summary>
-		/// <returns>
-		///     The number of available bytes for the current entry.
-		/// </returns>
-		public long Available => _entrySize - _entryOffset;
-
-		/// <summary>
-		///     Return a value of true if marking is supported; false otherwise.
-		/// </summary>
-		/// <remarks>Currently marking is not supported, the return value is always false.</remarks>
-		public bool IsMarkSupported => false;
-
-		/// <summary>
-		///     Set the entry factory for this instance.
-		/// </summary>
-		/// <param name="factory">The factory for creating new entries</param>
-		public void SetEntryFactory(IEntryFactory factory)
-		{
-			_entryFactory = factory;
-		}
 
 		/// <summary>
 		///     Skip bytes in the input buffer. This skips bytes in the
@@ -64,7 +37,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <param name="skipCount">
 		///     The number of bytes to skip.
 		/// </param>
-		public void Skip(long skipCount)
+		void Skip(long skipCount)
 		{
 			// TODO: REVIEW efficiency of TarInputStream.Skip
 			// This is horribly inefficient, but it ensures that we
@@ -74,7 +47,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 
 			for (var num = skipCount; num > 0;)
 			{
-				var toRead = num > skipBuf.Length ? skipBuf.Length : (int) num;
+				var toRead = num > skipBuf.Length ? skipBuf.Length : (int)num;
 				var numRead = Read(skipBuf, 0, toRead);
 
 				if (numRead == -1)
@@ -134,7 +107,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 					header.ParseBuffer(headerBuf);
 					if (!header.IsChecksumValid)
 					{
-						throw new TarException("Header checksum is invalid");
+						throw new InvalidDataException("Header checksum is invalid");
 					}
 
 					_entryOffset = 0;
@@ -142,72 +115,68 @@ namespace ICSharpCode.SharpZipLib.Tar
 
 					StringBuilder longName = null;
 
-					if (header.TypeFlag == TarHeader.LfGnuLongname)
+					switch (header.TypeFlag)
 					{
-						var nameBuffer = new byte[TarBuffer.BlockSize];
-						var numToRead = _entrySize;
+						case TarHeader.LfGnuLongname:
+							var nameBuffer = new byte[TarBuffer.BlockSize];
+							var numToRead = _entrySize;
 
-						longName = new StringBuilder();
+							longName = new StringBuilder();
 
-						while (numToRead > 0)
-						{
-							var numRead = Read(nameBuffer, 0, numToRead > nameBuffer.Length ? nameBuffer.Length : (int) numToRead);
-
-							if (numRead == -1)
+							while (numToRead > 0)
 							{
-								throw new InvalidHeaderException("Failed to read long name entry");
+								var numRead = Read(nameBuffer, 0, numToRead > nameBuffer.Length ? nameBuffer.Length : (int)numToRead);
+
+								if (numRead == -1)
+								{
+									throw new InvalidDataException("Failed to read long name entry");
+								}
+
+								longName.Append(TarHeader.ParseName(nameBuffer, 0, numRead));
+								numToRead -= numRead;
 							}
 
-							longName.Append(TarHeader.ParseName(nameBuffer, 0, numRead));
-							numToRead -= numRead;
-						}
+							SkipToNextEntry();
+							headerBuf = _tarBuffer.ReadBlock();
+							break;
+						case TarHeader.LfGhdr:
+							// POSIX global extended header 
+							// Ignore things we dont understand completely for now
+							SkipToNextEntry();
+							headerBuf = _tarBuffer.ReadBlock();
+							break;
+						case TarHeader.LfXhdr:
+							// POSIX extended header
+							// Ignore things we dont understand completely for now
+							SkipToNextEntry();
+							headerBuf = _tarBuffer.ReadBlock();
+							break;
+						case TarHeader.LfGnuVolhdr:
+							// TODO: could show volume name when verbose
+							SkipToNextEntry();
+							headerBuf = _tarBuffer.ReadBlock();
+							break;
+						default:
+							if (header.TypeFlag != TarHeader.LfNormal &&
+							    header.TypeFlag != TarHeader.LfOldnorm &&
+							    header.TypeFlag != TarHeader.LfLink &&
+							    header.TypeFlag != TarHeader.LfSymlink &&
+							    header.TypeFlag != TarHeader.LfDir)
+							{
+								// Ignore things we dont understand completely for now
+								SkipToNextEntry();
+								headerBuf = _tarBuffer.ReadBlock();
+							}
 
-						SkipToNextEntry();
-						headerBuf = _tarBuffer.ReadBlock();
-					}
-					else if (header.TypeFlag == TarHeader.LfGhdr)
-					{
-						// POSIX global extended header 
-						// Ignore things we dont understand completely for now
-						SkipToNextEntry();
-						headerBuf = _tarBuffer.ReadBlock();
-					}
-					else if (header.TypeFlag == TarHeader.LfXhdr)
-					{
-						// POSIX extended header
-						// Ignore things we dont understand completely for now
-						SkipToNextEntry();
-						headerBuf = _tarBuffer.ReadBlock();
-					}
-					else if (header.TypeFlag == TarHeader.LfGnuVolhdr)
-					{
-						// TODO: could show volume name when verbose
-						SkipToNextEntry();
-						headerBuf = _tarBuffer.ReadBlock();
-					}
-					else if (header.TypeFlag != TarHeader.LfNormal &&
-					         header.TypeFlag != TarHeader.LfOldnorm &&
-					         header.TypeFlag != TarHeader.LfLink &&
-					         header.TypeFlag != TarHeader.LfSymlink &&
-					         header.TypeFlag != TarHeader.LfDir)
-					{
-						// Ignore things we dont understand completely for now
-						SkipToNextEntry();
-						headerBuf = _tarBuffer.ReadBlock();
+							break;
 					}
 
-					if (_entryFactory == null)
+					_currentEntry = new TarEntry(headerBuf);
+					if (longName != null)
 					{
-						_currentEntry = new TarEntry(headerBuf);
-						if (longName != null)
-						{
-							_currentEntry.Name = longName.ToString();
-						}
+						_currentEntry.Name = longName.ToString();
 					}
-					else
-					{
-						_currentEntry = _entryFactory.CreateEntry(headerBuf);
-					}
+
 
 					// Magic was checked here for 'ustar' but there are multiple valid possibilities
 					// so this is not done anymore.
@@ -217,41 +186,18 @@ namespace ICSharpCode.SharpZipLib.Tar
 					// TODO: Review How do we resolve this discrepancy?!
 					_entrySize = _currentEntry.Size;
 				}
-				catch (InvalidHeaderException ex)
+				catch (InvalidDataException ex)
 				{
 					_entrySize = 0;
 					_entryOffset = 0;
 					_currentEntry = null;
 					var errorText = string.Format("Bad header in record {0} block {1} {2}",
 						_tarBuffer.CurrentRecord, _tarBuffer.CurrentBlock, ex.Message);
-					throw new InvalidHeaderException(errorText);
+					throw new InvalidDataException(errorText);
 				}
 			}
 
 			return _currentEntry;
-		}
-
-		/// <summary>
-		///     Copies the contents of the current tar archive entry directly into
-		///     an output stream.
-		/// </summary>
-		/// <param name="outputStream">
-		///     The OutputStream into which to write the entry's data.
-		/// </param>
-		public void CopyEntryContents(Stream outputStream)
-		{
-			var tempBuffer = new byte[32 * 1024];
-
-			while (true)
-			{
-				var numRead = Read(tempBuffer, 0, tempBuffer.Length);
-				if (numRead <= 0)
-				{
-					break;
-				}
-
-				outputStream.Write(tempBuffer, 0, numRead);
-			}
 		}
 
 		void SkipToNextEntry()
@@ -264,45 +210,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 			}
 
 			_readBuffer = null;
-		}
-
-		/// <summary>
-		///     This interface is provided, along with the method <see cref="SetEntryFactory" />, to allow
-		///     the programmer to have their own <see cref="TarEntry" /> subclass instantiated for the
-		///     entries return from <see cref="GetNextEntry" />.
-		/// </summary>
-		public interface IEntryFactory
-		{
-			/// <summary>
-			///     Create an entry based on name alone
-			/// </summary>
-			/// <param name="name">
-			///     Name of the new EntryPointNotFoundException to create
-			/// </param>
-			/// <returns>created TarEntry or descendant class</returns>
-			TarEntry CreateEntry(string name);
-
-			/// <summary>
-			///     Create an instance based on an actual file
-			/// </summary>
-			/// <param name="fileName">
-			///     Name of file to represent in the entry
-			/// </param>
-			/// <returns>
-			///     Created TarEntry or descendant class
-			/// </returns>
-			TarEntry CreateEntryFromFile(string fileName);
-
-			/// <summary>
-			///     Create a tar entry based on the header information passed
-			/// </summary>
-			/// <param name="headerBuffer">
-			///     Buffer containing header information to create an an entry from.
-			/// </param>
-			/// <returns>
-			///     Created TarEntry or descendant class
-			/// </returns>
-			TarEntry CreateEntry(byte[] headerBuffer);
 		}
 
 		#region Constructors
@@ -470,7 +377,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 
 			if (_readBuffer != null)
 			{
-				var sz = numToRead > _readBuffer.Length ? _readBuffer.Length : (int) numToRead;
+				var sz = numToRead > _readBuffer.Length ? _readBuffer.Length : (int)numToRead;
 
 				Array.Copy(_readBuffer, 0, buffer, offset, sz);
 
@@ -497,10 +404,10 @@ namespace ICSharpCode.SharpZipLib.Tar
 				if (rec == null)
 				{
 					// Unexpected EOF!
-					throw new TarException("unexpected EOF with " + numToRead + " bytes unread");
+					throw new InvalidDataException("unexpected EOF with " + numToRead + " bytes unread");
 				}
 
-				var sz = (int) numToRead;
+				var sz = (int)numToRead;
 				var recLen = rec.Length;
 
 				if (recLen > sz)
@@ -571,11 +478,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		///     Current entry being read
 		/// </summary>
 		TarEntry _currentEntry;
-
-		/// <summary>
-		///     Factory used to create TarEntry or descendant class instance
-		/// </summary>
-		IEntryFactory _entryFactory;
 
 		/// <summary>
 		///     Stream used as the source of input data.

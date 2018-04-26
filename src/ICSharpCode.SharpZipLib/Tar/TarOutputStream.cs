@@ -19,7 +19,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <remarks>The default value is true.</remarks>
 		public bool IsStreamOwner
 		{
-			get => _buffer.IsStreamOwner;
 			set => _buffer.IsStreamOwner = value;
 		}
 
@@ -128,7 +127,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		///     Ends the TAR archive without closing the underlying OutputStream.
 		///     The result is that the EOF block of nulls is written.
 		/// </summary>
-		public void Finish()
+		void Finish()
 		{
 			if (IsEntryOpen)
 			{
@@ -222,7 +221,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		///     to the output stream before this entry is closed and the
 		///     next entry written.
 		/// </summary>
-		public void CloseEntry()
+		void CloseEntry()
 		{
 			if (_assemblyBufferLength > 0)
 			{
@@ -239,10 +238,11 @@ namespace ICSharpCode.SharpZipLib.Tar
 				var errorText = string.Format(
 					"Entry closed at '{0}' before the '{1}' bytes specified in the header were written",
 					_currBytes, _currSize);
-				throw new TarException(errorText);
+				throw new InvalidDataException(errorText);
 			}
 		}
 
+		/// <inheritdoc />
 		/// <summary>
 		///     Writes a byte to the current tar archive entry.
 		///     This method simply calls Write(byte[], int, int).

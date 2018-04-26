@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using static System.String;
 
@@ -97,19 +96,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		}
 
 		/// <summary>
-		/// Construct an entry for a file. File is set to file, and the
-		/// header is constructed from information from the file.
-		/// </summary>
-		/// <param name = "fileName">The file name that the entry represents.</param>
-		/// <returns>Returns the newly created <see cref="TarEntry"/></returns>
-		public static TarEntry CreateEntryFromFile(string fileName)
-		{
-			var entry = new TarEntry();
-			entry.GetFileTarHeader(entry.TarHeader, fileName);
-			return entry;
-		}
-
-		/// <summary>
 		/// Determine if the two entries are equal. Equality is determined
 		/// by the header names being equal.
 		/// </summary>
@@ -133,26 +119,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		public override int GetHashCode()
 		{
 			return Name.GetHashCode();
-		}
-
-		/// <summary>
-		/// Determine if the given entry is a descendant of this entry.
-		/// Descendancy is determined by the name of the descendant
-		/// starting with this entry's name.
-		/// </summary>
-		/// <param name = "toTest">
-		/// Entry to be checked as a descendent of this.
-		/// </param>
-		/// <returns>
-		/// True if entry is a descendant of this.
-		/// </returns>
-		public bool IsDescendent(TarEntry toTest)
-		{
-			if (toTest == null) {
-				throw new ArgumentNullException(nameof(toTest));
-			}
-
-			return toTest.Name.StartsWith(Name, StringComparison.Ordinal);
 		}
 
 		/// <summary>
@@ -204,36 +170,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		}
 
 		/// <summary>
-		/// Convenience method to set this entry's group and user ids.
-		/// </summary>
-		/// <param name="userId">
-		/// This entry's new user id.
-		/// </param>
-		/// <param name="groupId">
-		/// This entry's new group id.
-		/// </param>
-		public void SetIds(int userId, int groupId)
-		{
-			UserId = userId;
-			GroupId = groupId;
-		}
-
-		/// <summary>
-		/// Convenience method to set this entry's group and user names.
-		/// </summary>
-		/// <param name="userName">
-		/// This entry's new user name.
-		/// </param>
-		/// <param name="groupName">
-		/// This entry's new group name.
-		/// </param>
-		public void SetNames(string userName, string groupName)
-		{
-			UserName = userName;
-			GroupName = groupName;
-		}
-
-		/// <summary>
 		/// Get/Set the modification time for this entry
 		/// </summary>
 		public DateTime ModTime {
@@ -279,103 +215,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		}
 
 		/// <summary>
-		/// Fill in a TarHeader with information from a File.
-		/// </summary>
-		/// <param name="header">
-		/// The TarHeader to fill in.
-		/// </param>
-		/// <param name="file">
-		/// The file from which to get the header information.
-		/// </param>
-		public void GetFileTarHeader(TarHeader header, string file)
-		{
-			if (header == null) {
-				throw new ArgumentNullException(nameof(header));
-			}
-
-			File = file ?? throw new ArgumentNullException(nameof(file));
-
-			// bugfix from torhovl from #D forum:
-			string name = file;
-
-			// 23-Jan-2004 GnuTar allows device names in path where the name is not local to the current directory
-			if (name.IndexOf(Directory.GetCurrentDirectory(), StringComparison.Ordinal) == 0) {
-				name = name.Substring(Directory.GetCurrentDirectory().Length);
-			}
-
-			/*
-						if (Path.DirectorySeparatorChar == '\\') 
-						{
-							// check if the OS is Windows
-							// Strip off drive letters!
-							if (name.Length > 2) 
-							{
-								char ch1 = name[0];
-								char ch2 = name[1];
-
-								if (ch2 == ':' && Char.IsLetter(ch1)) 
-								{
-									name = name.Substring(2);
-								}
-							}
-						}
-			*/
-
-			name = name.Replace(Path.DirectorySeparatorChar, '/');
-
-			// No absolute pathnames
-			// Windows (and Posix?) paths can start with UNC style "\\NetworkDrive\",
-			// so we loop on starting /'s.
-			while (name.StartsWith("/", StringComparison.Ordinal)) {
-				name = name.Substring(1);
-			}
-
-			header.LinkName = Empty;
-			header.Name = name;
-
-			if (Directory.Exists(file)) {
-				header.Mode = 1003; // Magic number for security access for a UNIX filesystem
-				header.TypeFlag = TarHeader.LfDir;
-				if ((header.Name.Length == 0) || header.Name[header.Name.Length - 1] != '/') {
-					header.Name = header.Name + "/";
-				}
-
-				header.Size = 0;
-			} else {
-				header.Mode = 33216; // Magic number for security access for a UNIX filesystem
-				header.TypeFlag = TarHeader.LfNormal;
-				header.Size = new FileInfo(file.Replace('/', Path.DirectorySeparatorChar)).Length;
-			}
-
-			header.ModTime = System.IO.File.GetLastWriteTime(file.Replace('/', Path.DirectorySeparatorChar)).ToUniversalTime();
-			header.DevMajor = 0;
-			header.DevMinor = 0;
-		}
-
-		/// <summary>
-		/// Get entries for all files present in this entries directory.
-		/// If this entry doesnt represent a directory zero entries are returned.
-		/// </summary>
-		/// <returns>
-		/// An array of TarEntry's for this entry's children.
-		/// </returns>
-		public IEnumerable<TarEntry> GetDirectoryEntries()
-		{
-			if ((File == null) || !Directory.Exists(File)) {
-				return new TarEntry[0];
-			}
-
-			var list = Directory.GetFileSystemEntries(File);
-			var result = new TarEntry[list.Length];
-
-			for (int i = 0; i < list.Length; ++i) {
-				result[i] = CreateEntryFromFile(list[i]);
-			}
-
-			return result;
-		}
-
-		/// <summary>
 		/// Write an entry's header information to a header buffer.
 		/// </summary>
 		/// <param name = "outBuffer">
@@ -387,21 +226,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		}
 
 		/// <summary>
-		/// Convenience method that will modify an entry's name directly
-		/// in place in an entry header buffer byte array.
-		/// </summary>
-		/// <param name="buffer">
-		/// The buffer containing the entry header to modify.
-		/// </param>
-		/// <param name="newName">
-		/// The new name to place into the header buffer.
-		/// </param>
-		public static void AdjustEntryName(byte[] buffer, string newName)
-		{
-			TarHeader.GetNameBytes(newName, buffer, 0, TarHeader.Namelen);
-		}
-
-		/// <summary>
 		/// Fill in a TarHeader given only the entry's name.
 		/// </summary>
 		/// <param name="header">
@@ -410,7 +234,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <param name="name">
 		/// The tar entry name.
 		/// </param>
-		public static void NameTarHeader(TarHeader header, string name)
+		static void NameTarHeader(TarHeader header, string name)
 		{
 			if (header == null) {
 				throw new ArgumentNullException(nameof(header));

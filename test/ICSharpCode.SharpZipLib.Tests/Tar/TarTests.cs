@@ -333,10 +333,10 @@ namespace ICSharpCode.SharpZipLib.Tests.Tar
 			var ms2 = new MemoryStream();
 			ms2.Write(ms.GetBuffer(), 0, ms.GetBuffer().Length);
 			ms2.Seek(0, SeekOrigin.Begin);
-			TarEntry nextEntry;
 
-			using (TarInputStream tarIn = new TarInputStream(ms2)) {
-				nextEntry = tarIn.GetNextEntry();
+			using (TarInputStream tarIn = new TarInputStream(ms2))
+			{
+				var nextEntry = tarIn.GetNextEntry();
 				Assert.IsTrue(nextEntry.TarHeader.IsChecksumValid, "Checksum should be valid");
 			}
 
@@ -350,8 +350,8 @@ namespace ICSharpCode.SharpZipLib.Tests.Tar
 				bool trapped = false;
 
 				try {
-					nextEntry = tarIn.GetNextEntry();
-				} catch (TarException) {
+					tarIn.GetNextEntry();
+				} catch (Exception) {
 					trapped = true;
 				}
 

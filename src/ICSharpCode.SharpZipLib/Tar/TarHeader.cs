@@ -50,10 +50,10 @@ namespace ICSharpCode.SharpZipLib.Tar
 			Name = "";
 			LinkName = "";
 
-			UserId = _defaultUserId;
-			GroupId = _defaultGroupId;
-			UserName = _defaultUser;
-			GroupName = _defaultGroupName;
+			UserId = 0;
+			GroupId = 0;
+			UserName = string.Empty;
+			GroupName = DefaultGroupName;
 			Size = 0;
 		}
 
@@ -229,29 +229,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 			return result;
 		}
 
-		/// <summary>
-		///     Set defaults for values used when constructing a TarHeader instance.
-		/// </summary>
-		/// <param name="userId">Value to apply as a default for userId.</param>
-		/// <param name="userName">Value to apply as a default for userName.</param>
-		/// <param name="groupId">Value to apply as a default for groupId.</param>
-		/// <param name="groupName">Value to apply as a default for groupName.</param>
-		internal static void SetValueDefaults(int userId, string userName, int groupId, string groupName)
-		{
-			_defaultUserId = _userIdAsSet = userId;
-			_defaultUser = _userNameAsSet = userName;
-			_defaultGroupId = _groupIdAsSet = groupId;
-			_defaultGroupName = _groupNameAsSet = groupName;
-		}
-
-		internal static void RestoreSetValues()
-		{
-			_defaultUserId = _userIdAsSet;
-			_defaultUser = _userNameAsSet;
-			_defaultGroupId = _groupIdAsSet;
-			_defaultGroupName = _groupNameAsSet;
-		}
-
 		// Return value that may be stored in octal or binary. Length must exceed 8.
 		//
 		static long ParseBinaryOrOctal(byte[] header, int offset, int length)
@@ -274,7 +251,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <param name="offset">The offset into the buffer from which to parse.</param>
 		/// <param name="length">The number of header bytes to parse.</param>
 		/// <returns>The long equivalent of the octal string.</returns>
-		public static long ParseOctal(byte[] header, int offset, int length)
+		static long ParseOctal(byte[] header, int offset, int length)
 		{
 			if (header == null)
 			{
@@ -374,31 +351,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <param name="bufferOffset">The index of the first byte to add</param>
 		/// <param name="length">The number of characters/bytes to add</param>
 		/// <returns>The next free index in the <paramref name="buffer" /></returns>
-		public static int GetNameBytes(StringBuilder name, int nameOffset, byte[] buffer, int bufferOffset, int length)
-		{
-			if (name == null)
-			{
-				throw new ArgumentNullException(nameof(name));
-			}
-
-			if (buffer == null)
-			{
-				throw new ArgumentNullException(nameof(buffer));
-			}
-
-			return GetNameBytes(name.ToString(), nameOffset, buffer, bufferOffset, length);
-		}
-
-		/// <summary>
-		///     Add <paramref name="name">name</paramref> to the buffer as a collection of bytes
-		/// </summary>
-		/// <param name="name">The name to add</param>
-		/// <param name="nameOffset">The offset of the first character</param>
-		/// <param name="buffer">The buffer to add to</param>
-		/// <param name="bufferOffset">The index of the first byte to add</param>
-		/// <param name="length">The number of characters/bytes to add</param>
-		/// <returns>The next free index in the <paramref name="buffer" /></returns>
-		public static int GetNameBytes(string name, int nameOffset, byte[] buffer, int bufferOffset, int length)
+		static int GetNameBytes(string name, int nameOffset, byte[] buffer, int bufferOffset, int length)
 		{
 			if (name == null)
 			{
@@ -422,45 +375,12 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <summary>
 		///     Add an entry name to the buffer
 		/// </summary>
-		/// <param name="name">
-		///     The name to add
-		/// </param>
-		/// <param name="buffer">
-		///     The buffer to add to
-		/// </param>
-		/// <param name="offset">
-		///     The offset into the buffer from which to start adding
-		/// </param>
-		/// <param name="length">
-		///     The number of header bytes to add
-		/// </param>
-		/// <returns>
-		///     The index of the next free byte in the buffer
-		/// </returns>
-		public static int GetNameBytes(StringBuilder name, byte[] buffer, int offset, int length)
-		{
-			if (name == null)
-			{
-				throw new ArgumentNullException(nameof(name));
-			}
-
-			if (buffer == null)
-			{
-				throw new ArgumentNullException(nameof(buffer));
-			}
-
-			return GetNameBytes(name.ToString(), 0, buffer, offset, length);
-		}
-
-		/// <summary>
-		///     Add an entry name to the buffer
-		/// </summary>
 		/// <param name="name">The name to add</param>
 		/// <param name="buffer">The buffer to add to</param>
 		/// <param name="offset">The offset into the buffer from which to start adding</param>
 		/// <param name="length">The number of header bytes to add</param>
 		/// <returns>The index of the next free byte in the buffer</returns>
-		public static int GetNameBytes(string name, byte[] buffer, int offset, int length)
+		static int GetNameBytes(string name, byte[] buffer, int offset, int length)
 		{
 			if (name == null)
 			{
@@ -523,7 +443,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <returns>
 		///     The offset of the character next byte after the octal string
 		/// </returns>
-		public static int GetOctalBytes(long value, byte[] buffer, int offset, int length)
+		static int GetOctalBytes(long value, byte[] buffer, int offset, int length)
 		{
 			if (buffer == null)
 			{
@@ -757,16 +677,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		public const byte LfDir = (byte) '5';
 
 		/// <summary>
-		///     FIFO (pipe) file type.
-		/// </summary>
-		public const byte LfFifo = (byte) '6';
-
-		/// <summary>
-		///     Contiguous file type.
-		/// </summary>
-		public const byte LfContig = (byte) '7';
-
-		/// <summary>
 		///     Posix.1 2001 global extended header
 		/// </summary>
 		public const byte LfGhdr = (byte) 'g';
@@ -779,51 +689,9 @@ namespace ICSharpCode.SharpZipLib.Tar
 		// POSIX allows for upper case ascii type as extensions
 
 		/// <summary>
-		///     Solaris access control list file type
-		/// </summary>
-		public const byte LfAcl = (byte) 'A';
-
-		/// <summary>
-		///     GNU dir dump file type
-		///     This is a dir entry that contains the names of files that were in the
-		///     dir at the time the dump was made
-		/// </summary>
-		public const byte LfGnuDumpdir = (byte) 'D';
-
-		/// <summary>
-		///     Solaris Extended Attribute File
-		/// </summary>
-		public const byte LfExtattr = (byte) 'E';
-
-		/// <summary>
-		///     Inode (metadata only) no file content
-		/// </summary>
-		public const byte LfMeta = (byte) 'I';
-
-		/// <summary>
-		///     Identifies the next file on the tape as having a long link name
-		/// </summary>
-		public const byte LfGnuLonglink = (byte) 'K';
-
-		/// <summary>
 		///     Identifies the next file on the tape as having a long name
 		/// </summary>
 		public const byte LfGnuLongname = (byte) 'L';
-
-		/// <summary>
-		///     Continuation of a file that began on another volume
-		/// </summary>
-		public const byte LfGnuMultivol = (byte) 'M';
-
-		/// <summary>
-		///     For storing filenames that dont fit in the main header (old GNU)
-		/// </summary>
-		public const byte LfGnuNames = (byte) 'N';
-
-		/// <summary>
-		///     GNU Sparse file
-		/// </summary>
-		public const byte LfGnuSparse = (byte) 'S';
 
 		/// <summary>
 		///     GNU Tape/volume header ignore on extraction
@@ -834,11 +702,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		///     The magic tag representing a POSIX tar archive.  (would be written with a trailing NULL)
 		/// </summary>
 		const string Tmagic = "ustar";
-
-		/// <summary>
-		///     The magic tag representing an old GNU tar archive where version is included in magic and overwrites it
-		/// </summary>
-		public const string GnuTmagic = "ustar  ";
 
 		const long TimeConversionFactor = 10000000L; // 1 tick == 100 nanoseconds
 		static readonly DateTime DateTime1970 = new DateTime(1970, 1, 1, 0, 0, 0, 0);
@@ -1044,15 +907,8 @@ namespace ICSharpCode.SharpZipLib.Tar
 		#region Class Fields
 
 		// Values used during recursive operations.
-		static int _userIdAsSet;
-		static int _groupIdAsSet;
-		static string _userNameAsSet;
-		static string _groupNameAsSet = "None";
 
-		static int _defaultUserId;
-		static int _defaultGroupId;
-		static string _defaultGroupName = "None";
-		static string _defaultUser;
+		const string DefaultGroupName = "None";
 
 		#endregion
 	}

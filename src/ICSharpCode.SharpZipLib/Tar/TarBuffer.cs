@@ -72,55 +72,16 @@ namespace ICSharpCode.SharpZipLib.Tar
 		public int RecordSize { get; private set; } = DefaultRecordSize;
 
 		/// <summary>
-		/// Get the TAR Buffer's record size.
-		/// </summary>
-		/// <returns>The record size in bytes.
-		/// This is equal to the <see cref="BlockFactor"/> multiplied by the <see cref="BlockSize"/></returns>
-		[Obsolete("Use RecordSize property instead")]
-		public int GetRecordSize()
-		{
-			return RecordSize;
-		}
-
-		/// <summary>
 		/// Get the Blocking factor for the buffer
 		/// </summary>
 		/// <value>This is the number of blocks in each record.</value>
-		public int BlockFactor {
-			get {
-				return blockFactor;
-			}
-		}
-
-		/// <summary>
-		/// Get the TAR Buffer's block factor
-		/// </summary>
-		/// <returns>The block factor; the number of blocks per record.</returns>
-		[Obsolete("Use BlockFactor property instead")]
-		public int GetBlockFactor()
-		{
-			return blockFactor;
-		}
+		int BlockFactor { get; set; } = DefaultBlockFactor;
 
 		/// <summary>
 		/// Construct a default TarBuffer
 		/// </summary>
-		protected TarBuffer()
+		TarBuffer()
 		{
-		}
-
-		/// <summary>
-		/// Create TarBuffer for reading with default BlockFactor
-		/// </summary>
-		/// <param name="inputStream">Stream to buffer</param>
-		/// <returns>A new <see cref="TarBuffer"/> suitable for input.</returns>
-		public static TarBuffer CreateInputTarBuffer(Stream inputStream)
-		{
-			if (inputStream == null) {
-				throw new ArgumentNullException(nameof(inputStream));
-			}
-
-			return CreateInputTarBuffer(inputStream, DefaultBlockFactor);
 		}
 
 		/// <summary>
@@ -141,26 +102,12 @@ namespace ICSharpCode.SharpZipLib.Tar
 
 			var tarBuffer = new TarBuffer
 			{
-				inputStream = inputStream,
-				outputStream = null
+				_inputStream = inputStream,
+				_outputStream = null
 			};
 			tarBuffer.Initialize(blockFactor);
 
 			return tarBuffer;
-		}
-
-		/// <summary>
-		/// Construct TarBuffer for writing with default BlockFactor
-		/// </summary>
-		/// <param name="outputStream">output stream for buffer</param>
-		/// <returns>A new <see cref="TarBuffer"/> suitable for output.</returns>
-		public static TarBuffer CreateOutputTarBuffer(Stream outputStream)
-		{
-			if (outputStream == null) {
-				throw new ArgumentNullException(nameof(outputStream));
-			}
-
-			return CreateOutputTarBuffer(outputStream, DefaultBlockFactor);
 		}
 
 		/// <summary>
@@ -181,8 +128,8 @@ namespace ICSharpCode.SharpZipLib.Tar
 
 			var tarBuffer = new TarBuffer
 			{
-				inputStream = null,
-				outputStream = outputStream
+				_inputStream = null,
+				_outputStream = outputStream
 			};
 			tarBuffer.Initialize(blockFactor);
 
@@ -194,16 +141,16 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </summary>
 		void Initialize(int archiveBlockFactor)
 		{
-			blockFactor = archiveBlockFactor;
+			BlockFactor = archiveBlockFactor;
 			RecordSize = archiveBlockFactor * BlockSize;
-			recordBuffer = new byte[RecordSize];
+			_recordBuffer = new byte[RecordSize];
 
-			if (inputStream != null) {
-				currentRecordIndex = -1;
-				currentBlockIndex = BlockFactor;
+			if (_inputStream != null) {
+				CurrentRecord = -1;
+				CurrentBlock = BlockFactor;
 			} else {
-				currentRecordIndex = 0;
-				currentBlockIndex = 0;
+				CurrentRecord = 0;
+				CurrentBlock = 0;
 			}
 		}
 
@@ -237,24 +184,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		}
 
 		/// <summary>
-		/// Skip over a block on the input stream.
-		/// </summary>
-		public void SkipBlock()
-		{
-			if (inputStream == null) {
-				throw new TarException("no input stream defined");
-			}
-
-			if (currentBlockIndex >= BlockFactor) {
-				if (!ReadRecord()) {
-					throw new TarException("Failed to read a record");
-				}
-			}
-
-			currentBlockIndex++;
-		}
-
-		/// <summary>
 		/// Read a block from the input stream.
 		/// </summary>
 		/// <returns>
@@ -262,20 +191,20 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </returns>
 		public byte[] ReadBlock()
 		{
-			if (inputStream == null) {
-				throw new TarException("TarBuffer.ReadBlock - no input stream defined");
+			if (_inputStream == null) {
+				throw new InvalidOperationException("TarBuffer.ReadBlock - no input stream defined");
 			}
 
-			if (currentBlockIndex >= BlockFactor) {
+			if (CurrentBlock >= BlockFactor) {
 				if (!ReadRecord()) {
-					throw new TarException("Failed to read a record");
+					throw new IOException("Failed to read a record");
 				}
 			}
 
-			byte[] result = new byte[BlockSize];
+			var result = new byte[BlockSize];
 
-			Array.Copy(recordBuffer, (currentBlockIndex * BlockSize), result, 0, BlockSize);
-			currentBlockIndex++;
+			Array.Copy(_recordBuffer, (CurrentBlock * BlockSize), result, 0, BlockSize);
+			CurrentBlock++;
 			return result;
 		}
 
@@ -287,17 +216,17 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </returns>
 		bool ReadRecord()
 		{
-			if (inputStream == null) {
-				throw new TarException("no input stream stream defined");
+			if (_inputStream == null) {
+				throw new InvalidOperationException("no input stream stream defined");
 			}
 
-			currentBlockIndex = 0;
+			CurrentBlock = 0;
 
 			int offset = 0;
 			int bytesNeeded = RecordSize;
 
 			while (bytesNeeded > 0) {
-				long numBytes = inputStream.Read(recordBuffer, offset, bytesNeeded);
+				long numBytes = _inputStream.Read(_recordBuffer, offset, bytesNeeded);
 
 				//
 				// NOTE
@@ -320,7 +249,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 				bytesNeeded -= (int)numBytes;
 			}
 
-			currentRecordIndex++;
+			CurrentRecord++;
 			return true;
 		}
 
@@ -329,31 +258,14 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </summary>
 		/// <remarks>Block numbers are zero based values</remarks>
 		/// <seealso cref="RecordSize"/>
-		public int CurrentBlock {
-			get { return currentBlockIndex; }
-		}
+		public int CurrentBlock { get; private set; }
 
 		/// <summary>
 		/// Gets or sets a flag indicating ownership of underlying stream.
 		/// When the flag is true <see cref="Close" /> will close the underlying stream also.
 		/// </summary>
 		/// <remarks>The default value is true.</remarks>
-		public bool IsStreamOwner { get; set; } = true;
-
-		/// <summary>
-		/// Get the current block number, within the current record, zero based.
-		/// </summary>
-		/// <returns>
-		/// The current zero based block number.
-		/// </returns>
-		/// <remarks>
-		/// The absolute block number = (<see cref="GetCurrentRecordNum">record number</see> * <see cref="BlockFactor">block factor</see>) + <see cref="GetCurrentBlockNum">block number</see>.
-		/// </remarks>
-		[Obsolete("Use CurrentBlock property instead")]
-		public int GetCurrentBlockNum()
-		{
-			return currentBlockIndex;
-		}
+		public bool IsStreamOwner { private get; set; } = true;
 
 		/// <summary>
 		/// Get the current record number.
@@ -361,21 +273,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <returns>
 		/// The current zero based record number.
 		/// </returns>
-		public int CurrentRecord {
-			get { return currentRecordIndex; }
-		}
-
-		/// <summary>
-		/// Get the current record number.
-		/// </summary>
-		/// <returns>
-		/// The current zero based record number.
-		/// </returns>
-		[Obsolete("Use CurrentRecord property instead")]
-		public int GetCurrentRecordNum()
-		{
-			return currentRecordIndex;
-		}
+		public int CurrentRecord { get; private set; }
 
 		/// <summary>
 		/// Write a block of data to the archive.
@@ -389,22 +287,22 @@ namespace ICSharpCode.SharpZipLib.Tar
 				throw new ArgumentNullException(nameof(block));
 			}
 
-			if (outputStream == null) {
-				throw new TarException("TarBuffer.WriteBlock - no output stream defined");
+			if (_outputStream == null) {
+				throw new InvalidOperationException("TarBuffer.WriteBlock - no output stream defined");
 			}
 
 			if (block.Length != BlockSize) {
 				string errorText = string.Format("TarBuffer.WriteBlock - block to write has length '{0}' which is not the block size of '{1}'",
 					block.Length, BlockSize);
-				throw new TarException(errorText);
+				throw new InvalidOperationException(errorText);
 			}
 
-			if (currentBlockIndex >= BlockFactor) {
+			if (CurrentBlock >= BlockFactor) {
 				WriteRecord();
 			}
 
-			Array.Copy(block, 0, recordBuffer, (currentBlockIndex * BlockSize), BlockSize);
-			currentBlockIndex++;
+			Array.Copy(block, 0, _recordBuffer, (CurrentBlock * BlockSize), BlockSize);
+			CurrentBlock++;
 		}
 
 		/// <summary>
@@ -424,8 +322,8 @@ namespace ICSharpCode.SharpZipLib.Tar
 				throw new ArgumentNullException(nameof(buffer));
 			}
 
-			if (outputStream == null) {
-				throw new TarException("TarBuffer.WriteBlock - no output stream stream defined");
+			if (_outputStream == null) {
+				throw new InvalidOperationException("TarBuffer.WriteBlock - no output stream stream defined");
 			}
 
 			if ((offset < 0) || (offset >= buffer.Length)) {
@@ -435,16 +333,16 @@ namespace ICSharpCode.SharpZipLib.Tar
 			if ((offset + BlockSize) > buffer.Length) {
 				string errorText = string.Format("TarBuffer.WriteBlock - record has length '{0}' with offset '{1}' which is less than the record size of '{2}'",
 					buffer.Length, offset, RecordSize);
-				throw new TarException(errorText);
+				throw new InvalidOperationException(errorText);
 			}
 
-			if (currentBlockIndex >= BlockFactor) {
+			if (CurrentBlock >= BlockFactor) {
 				WriteRecord();
 			}
 
-			Array.Copy(buffer, offset, recordBuffer, (currentBlockIndex * BlockSize), BlockSize);
+			Array.Copy(buffer, offset, _recordBuffer, (CurrentBlock * BlockSize), BlockSize);
 
-			currentBlockIndex++;
+			CurrentBlock++;
 		}
 
 		/// <summary>
@@ -452,15 +350,15 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </summary>
 		void WriteRecord()
 		{
-			if (outputStream == null) {
-				throw new TarException("TarBuffer.WriteRecord no output stream defined");
+			if (_outputStream == null) {
+				throw new InvalidOperationException("TarBuffer.WriteRecord no output stream defined");
 			}
 
-			outputStream.Write(recordBuffer, 0, RecordSize);
-			outputStream.Flush();
+			_outputStream.Write(_recordBuffer, 0, RecordSize);
+			_outputStream.Flush();
 
-			currentBlockIndex = 0;
-			currentRecordIndex++;
+			CurrentBlock = 0;
+			CurrentRecord++;
 		}
 
 		/// <summary>
@@ -470,17 +368,17 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// for the end of a tar stream.</remarks>
 		void WriteFinalRecord()
 		{
-			if (outputStream == null) {
-				throw new TarException("TarBuffer.WriteFinalRecord no output stream defined");
+			if (_outputStream == null) {
+				throw new InvalidOperationException("TarBuffer.WriteFinalRecord no output stream defined");
 			}
 
-			if (currentBlockIndex > 0) {
-				int dataBytes = currentBlockIndex * BlockSize;
-				Array.Clear(recordBuffer, dataBytes, RecordSize - dataBytes);
+			if (CurrentBlock > 0) {
+				int dataBytes = CurrentBlock * BlockSize;
+				Array.Clear(_recordBuffer, dataBytes, RecordSize - dataBytes);
 				WriteRecord();
 			}
 
-			outputStream.Flush();
+			_outputStream.Flush();
 		}
 
 		/// <summary>
@@ -489,30 +387,27 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </summary>
 		public void Close()
 		{
-			if (outputStream != null) {
+			if (_outputStream != null) {
 				WriteFinalRecord();
 
 				if (IsStreamOwner) {
-					outputStream.Dispose();
+					_outputStream.Dispose();
 				}
-				outputStream = null;
-			} else if (inputStream != null) {
+				_outputStream = null;
+			} else if (_inputStream != null) {
 				if (IsStreamOwner) {
-					inputStream.Dispose();
+					_inputStream.Dispose();
 				}
-				inputStream = null;
+				_inputStream = null;
 			}
 		}
 
 		#region Instance Fields
-		Stream inputStream;
-		Stream outputStream;
+		Stream _inputStream;
+		Stream _outputStream;
 
-		byte[] recordBuffer;
-		int currentBlockIndex;
-		int currentRecordIndex;
+		byte[] _recordBuffer;
 
-		int blockFactor = DefaultBlockFactor;
 		#endregion
 	}
 }
