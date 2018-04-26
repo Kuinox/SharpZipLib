@@ -69,11 +69,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// </summary>
 		/// <value>The record size in bytes.
 		/// This is equal to the <see cref="BlockFactor"/> multiplied by the <see cref="BlockSize"/></value>
-		public int RecordSize {
-			get {
-				return recordSize;
-			}
-		}
+		public int RecordSize { get; private set; } = DefaultRecordSize;
 
 		/// <summary>
 		/// Get the TAR Buffer's record size.
@@ -83,7 +79,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		[Obsolete("Use RecordSize property instead")]
 		public int GetRecordSize()
 		{
-			return recordSize;
+			return RecordSize;
 		}
 
 		/// <summary>
@@ -143,9 +139,11 @@ namespace ICSharpCode.SharpZipLib.Tar
 				throw new ArgumentOutOfRangeException(nameof(blockFactor), "Factor cannot be negative");
 			}
 
-			var tarBuffer = new TarBuffer();
-			tarBuffer.inputStream = inputStream;
-			tarBuffer.outputStream = null;
+			var tarBuffer = new TarBuffer
+			{
+				inputStream = inputStream,
+				outputStream = null
+			};
 			tarBuffer.Initialize(blockFactor);
 
 			return tarBuffer;
@@ -181,9 +179,11 @@ namespace ICSharpCode.SharpZipLib.Tar
 				throw new ArgumentOutOfRangeException(nameof(blockFactor), "Factor cannot be negative");
 			}
 
-			var tarBuffer = new TarBuffer();
-			tarBuffer.inputStream = null;
-			tarBuffer.outputStream = outputStream;
+			var tarBuffer = new TarBuffer
+			{
+				inputStream = null,
+				outputStream = outputStream
+			};
 			tarBuffer.Initialize(blockFactor);
 
 			return tarBuffer;
@@ -195,7 +195,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		void Initialize(int archiveBlockFactor)
 		{
 			blockFactor = archiveBlockFactor;
-			recordSize = archiveBlockFactor * BlockSize;
+			RecordSize = archiveBlockFactor * BlockSize;
 			recordBuffer = new byte[RecordSize];
 
 			if (inputStream != null) {
@@ -205,35 +205,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 				currentRecordIndex = 0;
 				currentBlockIndex = 0;
 			}
-		}
-
-		/// <summary>
-		/// Determine if an archive block indicates End of Archive. End of
-		/// archive is indicated by a block that consists entirely of null bytes.
-		/// All remaining blocks for the record should also be null's
-		/// However some older tars only do a couple of null blocks (Old GNU tar for one)
-		/// and also partial records
-		/// </summary>
-		/// <param name = "block">The data block to check.</param>
-		/// <returns>Returns true if the block is an EOF block; false otherwise.</returns>
-		[Obsolete("Use IsEndOfArchiveBlock instead")]
-		public bool IsEOFBlock(byte[] block)
-		{
-			if (block == null) {
-				throw new ArgumentNullException(nameof(block));
-			}
-
-			if (block.Length != BlockSize) {
-				throw new ArgumentException("block length is invalid");
-			}
-
-			for (int i = 0; i < BlockSize; ++i) {
-				if (block[i] != 0) {
-					return false;
-				}
-			}
-
-			return true;
 		}
 
 
@@ -463,7 +434,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 
 			if ((offset + BlockSize) > buffer.Length) {
 				string errorText = string.Format("TarBuffer.WriteBlock - record has length '{0}' with offset '{1}' which is less than the record size of '{2}'",
-					buffer.Length, offset, recordSize);
+					buffer.Length, offset, RecordSize);
 				throw new TarException(errorText);
 			}
 
@@ -541,7 +512,6 @@ namespace ICSharpCode.SharpZipLib.Tar
 		int currentBlockIndex;
 		int currentRecordIndex;
 
-		int recordSize = DefaultRecordSize;
 		int blockFactor = DefaultBlockFactor;
 		#endregion
 	}

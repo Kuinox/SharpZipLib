@@ -467,7 +467,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 					break;
 				}
 
-				if (entry.TarHeader.TypeFlag == TarHeader.LF_LINK || entry.TarHeader.TypeFlag == TarHeader.LF_SYMLINK)
+				if (entry.TarHeader.TypeFlag == TarHeader.LfLink || entry.TarHeader.TypeFlag == TarHeader.LfSymlink)
 					continue;
 
 				ExtractEntry(destinationDirectory, entry);
@@ -698,6 +698,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 			}
 		}
 
+		/// <inheritdoc />
 		/// <summary>
 		/// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
 		/// </summary>
@@ -727,7 +728,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 		/// <summary>
 		/// Closes the archive and releases any associated resources.
 		/// </summary>
-		public virtual void Close()
+		protected virtual void Close()
 		{
 			Dispose(true);
 		}
@@ -747,7 +748,7 @@ namespace ICSharpCode.SharpZipLib.Tar
 			try {
 				Directory.CreateDirectory(directoryName);
 			} catch (Exception e) {
-				throw new TarException("Exception creating directory '" + directoryName + "', " + e.Message, e);
+				throw new IOException("Exception creating directory '" + directoryName + "', " + e.Message, e);
 			}
 		}
 
